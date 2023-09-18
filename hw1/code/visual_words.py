@@ -171,14 +171,24 @@ def get_visual_words(opts, img, dictionary):
     '''
     
     # ----- TODO -----
+    
+    # initialize wordmap where each pixel is assigned the closest visual word
+    # of the filter response at the respective pixel
     wordmap = np.zeros((img.shape[0], img.shape[1]))
+    
+    # extract filter response of img
     filter_responses = extract_filter_responses(opts, img)
     rows, cols = filter_responses.shape[0], filter_responses.shape[1]
     
     for i in range(rows):
         for j in range(cols):
+            # retrieve vector from pixel in the filter response (1 x 3F)
             filter_responses_vec = np.array([filter_responses[i, j, :]])
+            
+            # calculate distance between vector from a pixel in the filter response to visual words in dictionary
             dist_to_visual_words = scipy.spatial.distance.cdist(filter_responses_vec, dictionary, metric='euclidean')
+            
+            # retrieve closest visual word
             closest_visual_word = np.argmin(dist_to_visual_words)
             wordmap[i, j] = closest_visual_word
 
