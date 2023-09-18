@@ -22,7 +22,18 @@ def get_feature_from_wordmap(opts, wordmap):
 
     K = opts.K
     # ----- TODO -----
-    pass
+
+    # histogram is of length equal to the dictionary (e.g. K)
+    hist = np.zeros(K)
+
+    # count how often each words appears in the image
+    for visual_word in range(K):
+        hist[visual_word] = np.count_nonzero(wordmap == visual_word)
+    
+    # L1 normalization on histogram
+    hist_norm = np.linalg.norm(hist, ord=1)
+    hist = hist / hist_norm
+    return hist
 
 def get_feature_from_wordmap_SPM(opts, wordmap):
     '''
