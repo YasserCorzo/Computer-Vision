@@ -111,7 +111,16 @@ def get_image_feature(opts, img_path, dictionary):
     '''
 
     # ----- TODO -----
-    pass
+    img = Image.open(img_path)
+    img = np.array(img).astype(np.float32)/255
+    
+    # create a wordmap that maps each pixel in the image to its closest word in the dictionary
+    wordmap = visual_words.get_visual_words(opts, img, dictionary)
+    
+    # create histogram of visual words using spatial pyramid matching
+    spatial_pyramid_hist = get_feature_from_wordmap_SPM(opts, wordmap)
+    
+    return spatial_pyramid_hist
 
 def build_recognition_system(opts, n_worker=1):
     '''
@@ -135,8 +144,23 @@ def build_recognition_system(opts, n_worker=1):
     train_files = open(join(data_dir, 'train_files.txt')).read().splitlines()
     train_labels = np.loadtxt(join(data_dir, 'train_labels.txt'), np.int32)
     dictionary = np.load(join(out_dir, 'dictionary.npy'))
-
     # ----- TODO -----
+    
+    # create pool of workers
+    pool = multiprocessing.Pool(n_worker)
+    
+    # extract histograms from every image
+    spatial_histograms_list = [pool.apply_async(get_image_feature, args=(opts, join(data_dir, train_file), dictionary)) for train_file in train_files]
+    
+    features = [ar.get() for ar in spatial_histograms_list]
+    
+    # save data to build recognition system
+    np.savez_compressed(join(out_dir, 'trained_system.npz'),
+        features=features,
+        labels=train_labels,
+        dictionary=dictionary,
+        SPM_layer_num=SPM_layer_num,
+    )
     pass
 
     ## example code snippet to save the learned system
@@ -161,7 +185,7 @@ def distance_to_set(word_hist, histograms):
 
     # ----- TODO -----
     
-    pass    
+    return np.sum(np.minimum(word_hist, histograms), axis=1)
     
 def evaluate_recognition_system(opts, n_worker=1):
     '''
