@@ -1,6 +1,7 @@
 import os, math, multiprocessing
 from os.path import join
 from copy import copy
+from turtle import distance
 
 import numpy as np
 from PIL import Image
@@ -74,7 +75,7 @@ def get_feature_from_wordmap_SPM(opts, wordmap):
         if layer > 1:
             weight = 2 ** (layer - L - 1)
         else:
-            weight = 2 ** (-L)
+            weight = 1 / (2 ** L)
         curr_layer_hist = curr_layer_hist * weight
         
         # concatenate histogram
@@ -215,5 +216,36 @@ def evaluate_recognition_system(opts, n_worker=1):
     test_labels = np.loadtxt(join(data_dir, 'test_labels.txt'), np.int32)
 
     # ----- TODO -----
-    pass
+
+    # load recognition system model
+    trained_features = trained_system['features']
+    trained_labels = trained_system['labels']
+
+    # confusion matrix
+    C = np.zeros((8, 8))
+
+    # create pool of workers
+    pool = multiprocessing.Pool(n_worker)
+    
+    # extract features every test images
+    test_spatial_histograms_list = [pool.apply_async(get_image_feature, args=(test_opts, join(data_dir, test_file), dictionary)) for test_file in test_files]
+   
+    # build histogram matrix from test image features
+    test_features = [ar.get() for ar in test_spatial_histograms_list]
+
+    for (i, test_feature) in enumerate(test_features):
+        dist = distance_to_set(test_feature, trained_features)
+        
+        # predict label for test feature
+        predicted_label = trained_labels[np.argmax(dist)]
+
+        # ground truth (actual label) of test feature
+        actual_label = test_labels[i]
+
+        # record instance where class i was predicted as class j
+        C[predicted_label, actual_label] += 1
+    
+    # accuracy of correctly classified images is given by the trace of C divided by sum of C
+    accuracy = np.trace(C) / np.sum(C)
+    return C, accuracy
 

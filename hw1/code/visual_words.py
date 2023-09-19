@@ -24,11 +24,7 @@ def extract_filter_responses(opts, img):
     
     # if image is in greyscale, duplicate them into 3 channels
     if img.ndim != 3:
-        grey_img = np.zeros_like(img)
-        grey_img[:, :, 0] = img
-        grey_img[:, :, 1] = img
-        grey_img[:, :, 2] = img
-        img = grey_img
+        img = skimage.color.gray2rgb(img)
     
     # convert image into Lab color space
     img = skimage.color.rgb2lab(img)
@@ -84,13 +80,12 @@ def compute_dictionary_one_image(args):
     '''
 
     # ----- TODO -----
-    file_num, train_file, opts = args
+    train_file, opts = args
     data_dir = opts.data_dir
     alpha = opts.alpha
     
     # read the image
     img_path = join(data_dir, train_file)   
-    print(img_path, " ", file_num)
     img = Image.open(img_path)
     img = np.array(img).astype(np.float32)/255
     
@@ -102,7 +97,7 @@ def compute_dictionary_one_image(args):
     y = np.random.randint(0, img.shape[0], size=alpha)
     points = np.vstack((x, y)).T
     alpha_points = filter_response[points[:, 1], points[:, 0], :]
-    return [(file_num, alpha_points)]
+    return alpha_points
     
 
 def compute_dictionary(opts, n_worker=1):
@@ -133,23 +128,15 @@ def compute_dictionary(opts, n_worker=1):
     # Create pool of workers
     pool = multiprocessing.Pool(n_worker)
     
-    image_alpha_points = dict()
+    # collect coordinates of alpha random points from every image in the training set
+    args = [(train_file, opts) for train_file in train_files]
+    alpha_points_list = list(pool.map(compute_dictionary_one_image, args))
     
-    args = [(i, train_file, opts) for (i, train_file) in enumerate(train_files)]
-    
-    overall_dict = pool.map(compute_dictionary_one_image, args)
-
-    for sub_list in overall_dict:
-        tup = sub_list[0]
-        key = tup[0]
-        alpha_points = tup[1]
-        image_alpha_points[key] = alpha_points
-    
-    # loop through every image's filter response with alpha points and collect them
+    # add alpha points from every image onto the filter responses matrix
     for (file_num, path) in enumerate(train_files):
-        alpha_points = image_alpha_points[file_num]
+        alpha_points = alpha_points_list[file_num]
         filter_responses[file_num * alpha: (file_num + 1) * alpha, :] = alpha_points
-    
+
     kmeans = sklearn.cluster.KMeans(n_clusters=K).fit(filter_responses)
     dictionary = kmeans.cluster_centers_
     np.save(join(out_dir, 'dictionary.npy'), dictionary)
