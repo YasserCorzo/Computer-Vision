@@ -50,7 +50,51 @@ def get_feature_from_wordmap_SPM(opts, wordmap):
     K = opts.K
     L = opts.L
     # ----- TODO -----
-    pass
+    height, width = wordmap.shape
+    finest_layer_hist_matrix = np.zeros((2 ** L, 2 ** L, K))
+    hist_all = []
+    
+    # creating the histogram of the finest layer as a 3d matrix (2^l x 2^l x K)
+    # K = # of bag of words
+    for cell_row in range(2 ** L):
+        for cell_col in range(2 ** L):
+            ith_cell_height = height // (2 ** L)
+            ith_cell_width = width // (2 ** L)
+            ith_cell = wordmap[cell_row * ith_cell_height : (cell_row + 1) * ith_cell_height, cell_col * ith_cell_width : (cell_col + 1) * ith_cell_width]
+            cell_hist = get_feature_from_wordmap(opts, ith_cell)
+            finest_layer_hist_matrix[cell_row, cell_col, :] = cell_hist
+    
+    # create overall histogram of all levels
+    curr_layer_hist_matrix = finest_layer_hist_matrix
+    for layer in range(L, -1, -1):
+        # turn the current layer's histogram matrix into a normal histogram (vector)
+        curr_layer_hist = curr_layer_hist_matrix.flatten(order='C')
+            
+        # apply weight to histogram
+        if layer > 1:
+            weight = 2 ** (layer - L - 1)
+        else:
+            weight = 2 ** (-L)
+        curr_layer_hist = curr_layer_hist * weight
+        
+        # concatenate histogram
+        hist_all = np.append(curr_layer_hist, hist_all)
+        
+        # normalize histogram after aggregation
+        hist_norm = np.linalg.norm(hist_all, ord=1)
+        hist_all = hist_all / hist_norm
+            
+        # create the previous layer's histogram matrix
+        if layer > 0:
+            prev_layer_hist_matrix = np.zeros((2 ** (layer - 1), 2 ** (layer - 1), K))
+            rows, cols = prev_layer_hist_matrix.shape[0], prev_layer_hist_matrix.shape[1]
+            for row_cell in range(rows):
+                for col_cell in range(cols):
+                    # histogram of previous layer can be aggregated from current layer
+                    prev_layer_hist_matrix[row_cell, col_cell, :] = np.sum(curr_layer_hist_matrix[row_cell * 2 : (row_cell + 1) * 2, col_cell * 2 : (col_cell + 1) * 2, :], axis = 0).sum(axis = 0)
+            curr_layer_hist_matrix = prev_layer_hist_matrix
+            
+    return hist_all
     
 def get_image_feature(opts, img_path, dictionary):
     '''
@@ -116,6 +160,7 @@ def distance_to_set(word_hist, histograms):
     '''
 
     # ----- TODO -----
+    
     pass    
     
 def evaluate_recognition_system(opts, n_worker=1):

@@ -34,10 +34,18 @@ def main():
     wordmap = visual_words.get_visual_words(opts, img, dictionary)
     hist = visual_recog.get_feature_from_wordmap(opts, wordmap)
     util.visualize_wordmap(wordmap)
+    
+    ## testing
+    #hist_all = visual_recog.get_feature_from_wordmap_SPM(opts, wordmap)
+    #correct_dimension = (opts.K * (4 ** (opts.L + 1) - 1)) / 3
+    #print(hist_all.sum())
+    #print(hist_all.shape[0])
+    #print(correct_dimension)
+
 
     ## Q2.1-2.4
-    # n_cpu = util.get_num_CPU()
-    # visual_recog.build_recognition_system(opts, n_worker=n_cpu)
+    #n_cpu = util.get_num_CPU()
+    #visual_recog.build_recognition_system(opts, n_worker=n_cpu)
 
     ## Q2.5
     # n_cpu = util.get_num_CPU()
