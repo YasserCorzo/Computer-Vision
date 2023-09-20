@@ -27,8 +27,8 @@ def main():
     
     ## Q1.3
     img_path = join(opts.data_dir, 'kitchen/sun_aasmevtpkslccptd.jpg')
-    img_path = join(opts.data_dir, 'aquarium/sun_aairflxfskjrkepm.jpg')
     img = Image.open(img_path)
+    img.show()
     img = np.array(img).astype(np.float32)/255
     dictionary = np.load(join(opts.out_dir, 'dictionary.npy'))
     wordmap = visual_words.get_visual_words(opts, img, dictionary)
@@ -43,6 +43,11 @@ def main():
     n_cpu = util.get_num_CPU()
     conf, accuracy = visual_recog.evaluate_recognition_system(opts, n_worker=n_cpu)
     
+    # hyperparams for accuracy of 65%:
+    # filter-scales: 1 2 3 4 5
+    # K: 30
+    # alpha: 135
+    # L: 1
     print(conf)
     print(accuracy)
     np.savetxt(join(opts.out_dir, 'confmat.csv'), conf, fmt='%d', delimiter=',')

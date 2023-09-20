@@ -73,7 +73,7 @@ def get_feature_from_wordmap_SPM(opts, wordmap):
             
         # apply weight to histogram
         if layer > 1:
-            weight = 2 ** (layer - L - 1)
+            weight = 1 / (2 ** abs(layer - L - 1))
         else:
             weight = 1 / (2 ** L)
         curr_layer_hist = curr_layer_hist * weight
