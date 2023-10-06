@@ -23,12 +23,10 @@ hp_cover = cv2.resize(hp_cover, (cv_cover.shape[1], cv_cover.shape[0]))
 
 # compute matched features 
 matches, locs1, locs2 = matchPics(cv_desk, cv_cover, opts)
-print("size of desk:",cv_desk.shape)
-print("size of cover:", cv_cover.shape)
 #plotMatches(cv_cover, cv_desk, matches, locs1, locs2)
 
 # coordinates of matched features
-x1_match, x2_match = calculateMatches(matches, locs1, locs2)
+x1_match, x2_match = findMatches(matches, locs1, locs2)
 
 # compute best homography and inliers
 bestH2to1, inliers = computeH_ransac(x1_match, x2_match, opts)

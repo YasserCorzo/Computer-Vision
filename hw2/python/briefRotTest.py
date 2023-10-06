@@ -13,7 +13,7 @@ angles = []
 num_matches = []
 for i in range(36):
 	#Rotate Image
-	angle = (i + 1) * 10
+	angle = i * 10
 	print(angle)
 	rotated_cv_cover_img = scipy.ndimage.rotate(cv_cover_img, angle, reshape=False)
 
@@ -29,6 +29,6 @@ for i in range(36):
 
 #Display histogram
 plt.bar(angles, num_matches, linewidth=10.0)
-plt.xlabel("angle of rotation")
+plt.xlabel("Angle of rotation (degrees)")
 plt.ylabel("Number of matches")
 plt.show()

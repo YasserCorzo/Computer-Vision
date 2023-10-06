@@ -10,8 +10,6 @@ def computeH(x1, x2):
 	# first compute A (matrix derived from points in x1 and x2)
 
 	# N is number of corresponding points in x1 and x2
-	print("x1:",x1)
-	print("x2:",x2)
 	N = x1.shape[0]
 	A = np.zeros((N * 2, 9))
 
@@ -20,7 +18,7 @@ def computeH(x1, x2):
 		(x, y) = (x2[i, 0], x2[i, 1])
 		(u, v) = (x1[i, 0], x1[i, 1])
 		A[i * 2 : (i * 2) + 2] = np.array(([x, y, 1, 0, 0, 0, -x * u, -y * u, -u], [0, 0, 0, x, y, 1, -x * v, -y * v, -v]))
-	print(A)
+
 	# compute small h that solves Ah = 0
 	u, s, v = np.linalg.svd(A, full_matrices=True, compute_uv=True, hermitian=False)
 	# h equals the eigenvector corresponding to the zero eigenvalue. Thus, we choose the smallest eigenvalue 
@@ -40,12 +38,11 @@ def computeH_norm(x1, x2):
 	#Compute the centroid of the points
 	x1_centroid = np.mean(x1, axis=0)
 	x2_centroid = np.mean(x2, axis=0)
-	print("mean x1:", x1_centroid)
 
 	#Shift the origin of the points to the centroid
 	x1_shifted = x1 - x1_centroid
 	x2_shifted = x2 - x2_centroid
-	print("x1 shifted", x1_shifted)
+	
 	#Normalize the points so that the largest distance from the origin is equal to sqrt(2)
 	max_dist_x1 = np.amax(np.linalg.norm(x1_shifted, axis=1))
 	scale1 = np.sqrt(2) / max_dist_x1
@@ -84,20 +81,14 @@ def computeH_ransac(locs1, locs2, opts):
 
 	for i in range(max_iters):
 		# randomly sample at least 4 points
-		num_points = np.random.randint(4, locs1.shape[0] - 1)
-		x1_sample, x2_sample = sampleRandomPoints(locs1, locs2, num_points=num_points)
-		print("samples x1:", x1_sample)
-		print("samples x2:", x2_sample)
+		x1_sample, x2_sample = sampleRandomPoints(locs1, locs2, num_points=4)
 
 		# compute H using sampled points
 		H_norm = computeH_norm(x1_sample, x2_sample)
-		print("x1:", locs1)
-		print("x2:", locs2)
-		print("H norm:", H_norm)
 
 		# calculate number of inliers as well as inliers using H computed from sample correspondences
 		ith_num_inliers, ith_inliers_vec = calculateInliers(locs1, locs2, H_norm, inlier_tol)
-		print(ith_inliers_vec)
+		
 		# update number of inliers and inliers vector
 		if ith_num_inliers > max_num_inliers:
 			max_num_inliers = ith_num_inliers
@@ -106,7 +97,6 @@ def computeH_ransac(locs1, locs2, opts):
 	# get which points in inliers contains a 1.
 	# those will be the ith corresponding points in locs1 and locs2 that compute the best fitting H
 	consensus_set_indexes = np.where(inliers == 1)[0]
-	print("consensus_i=", np.where(inliers == 1))
 	bestH2to1 = computeH_norm(locs1[consensus_set_indexes], locs2[consensus_set_indexes])
 
 	return bestH2to1, inliers
@@ -124,19 +114,21 @@ def compositeH(H2to1, template, img):
 	
 
 	#Create mask of same size as template
-	white = np.zeros((template.shape[0], template.shape[1]))
+	white = np.zeros((template.shape[0], template.shape[1], 3))
 	white.fill(255)
-
+	
 	#Warp mask by appropriate homography
 	warp_mask = cv2.warpPerspective(white, H2to1, (img.shape[1], img.shape[0]))
-
+	
 	#Warp template by appropriate homography
 	warp_template = cv2.warpPerspective(template, H2to1, (img.shape[1], img.shape[0]))
 
 	#Use mask to combine the warped template and the image
-	not_warp_mask = np.logical_not(warp_template)
+	not_warp_mask = np.logical_not(warp_mask)
 	apply_mask = np.multiply(img, not_warp_mask)
+	
 	composite_img = apply_mask + warp_template
+	
 	return composite_img 
 
 
