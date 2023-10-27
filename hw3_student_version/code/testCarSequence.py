@@ -17,8 +17,6 @@ seq = np.load("../data/carseq.npy")
 rect = [59, 116, 145, 151]
 
 num_frames = seq.shape[2]
-w_rect = rect[2] - rect[0]
-h_rect = rect[3] - rect[1]
 
 # loop over video frames
 seq_rects = []
