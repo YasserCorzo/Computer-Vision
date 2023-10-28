@@ -19,11 +19,12 @@ def SubtractDominantMotion(image1, image2, threshold, num_iters, tolerance):
     mask = np.ones(image1.shape, dtype=bool)
 
     # calculate M (affine transformation matrix)
+    '''
     M = LucasKanadeAffine(image1, image2, threshold, num_iters)
-
-    # spline image1
+    
+    # spline 
     image1_spline = RectBivariateSpline(np.arange(image1.shape[0]), np.arange(image1.shape[1]), image1)
-
+    image2_spline = RectBivariateSpline(np.arange(image2.shape[0]), np.arange(image2.shape[1]), image2)
     # create 3D matrix of homogenous coordinates in image1
     rows = np.arange(image1.shape[0])
     cols = np.arange(image1.shape[1])
@@ -38,32 +39,75 @@ def SubtractDominantMotion(image1, image2, threshold, num_iters, tolerance):
     warped_grid = warped_coords[:2, :].T.reshape(len(rows), len(cols), 2)
 
     # retrieve warped pixel values
-    image1_w = image1_spline.ev(warped_grid[:, :, 1], warped_grid[:, :, 0])
+    image1_w = image2_spline.ev(warped_grid[:, :, 1], warped_grid[:, :, 0])
 
     # retrieve coordinates in warped image that exceed image boundaries
     x_thresh = len(rows)
     y_thresh = len(cols)
-    i = np.where((warped_coords[0] >= x_thresh) | (warped_coords[1] >= y_thresh) | (warped_coords[0] < 0) | (warped_coords[1] < 0))[0]
-    not_valid_coords = warped_coords[:, i]
+    i = np.where((warped_coords[0] <= x_thresh) & (warped_coords[0] >= 0) & (warped_coords[1] >= 0) | (warped_coords[1] <= y_thresh))[0]
+    valid_coords = warped_coords[:, i]
 
     # find matching not valid coords in image1
-    not_valid_coords_img1 = (np.linalg.inv(M) @ not_valid_coords).T[:, :-1].astype('int')
+    valid_coords_img1 = (np.linalg.inv(M) @ valid_coords).T[:, :-1]
 
-    # set not valid coords in warped image1 to 0
-    #image1_w[not_valid_coords_img1[:, 0], not_valid_coords_img1[:, 1]] = 0
-   
-    # calculate absolute difference between warped img and image at time t+1
-    abs_diff = np.abs(image2 - image1_w)
-    #abs_diff[not_valid_coords_img1[:, 1], not_valid_coords_img1[:, 0]] = 0
+    # grid of valid coords
+    valid_coords_grid = valid_coords_img1.T.reshape(image1.shape[0], image1.shape[1], 2)
 
-    # calculate locations where difference exceeds threshold
-    mask = abs_diff > tolerance
+    # retrieve valid coordinate values in image1
+    image1_valid = image1_spline.ev(valid_coords_grid[:, :, 1], valid_coords_grid[:, :, 0])
 
-    # erode mask (shrink bright regions and enlarge dark regions)
+    # warp new image 1
+    image1_w = affine_transform(image1_valid, np.linalg.norm(M))
+
+    # find absolute difference
+    diff = np.abs(image2 - image1_w)
+
+    # mask the difference (place 1 where diff > tolerance)
+    mask = diff > tolerance
+
     structuring_element = np.ones((3, 3))
-    mask = binary_erosion(mask, structuring_element)
 
-    # dilate mask (enlarge bright regions and shrink dark regions)
-    mask = binary_dilation(mask, structuring_element)
+    # erode mask (shrink dark regions and enlarge light regions)
+    mask = binary_erosion(mask)
 
-    return mask.astype(int)
+    # dilate mask (enlarge dark regions and shrink light regions)
+    mask = binary_dilation(mask)
+
+    return mask
+    '''
+
+    M = LucasKanadeAffine(image1, image2, threshold, num_iters)
+    M = M[:2,:]
+    M = np.concatenate([M, np.array([0,0,1])[np.newaxis,:]])
+
+    # Eliminate the invalid coordinates
+    It_interp = RectBivariateSpline(range(image1.shape[0]), range(image1.shape[1]), image1)
+    h,w = image1.shape
+    x_linspace = np.arange(w)
+    y_linspace = np.arange(h)
+    y, x = np.meshgrid(y_linspace, x_linspace)
+
+    original_coordinate = np.stack([x, y, np.ones_like(x)], axis=-1)
+    # print("M {} original_coordinate {} y {}".format(M.shape, original_coordinate.shape, y.shape)) # (320, 240, 3, 3)
+    tiled_M = np.tile(np.linalg.inv(M), (y.shape[0], y.shape[1], 1, 1)) # tiled transformation matrix for each point
+    # print("tiled_M", tiled_M.shape) # (320, 240, 3, 3)
+    warpped_coordinates = tiled_M @ original_coordinate[:,:,:,np.newaxis]
+    warpped_coordinates = np.squeeze(warpped_coordinates)
+    # convert to x-y coordinate
+    warpped_coordinates[:,:,0] /= warpped_coordinates[:,:,2]
+    warpped_coordinates[:,:,1] /= warpped_coordinates[:,:,2]
+    x_warp = warpped_coordinates[:,:,0]
+    y_warp = warpped_coordinates[:,:,1]
+    valid_warp = (warpped_coordinates[:,:,0]>=0) & (warpped_coordinates[:,:,0]<image1.shape[1]) & (warpped_coordinates[:,:,1]>=0)& (warpped_coordinates[:,:,1]<image1.shape[0])
+
+    It_patch = It_interp.ev(y_warp,x_warp)
+    It1_patch = image2[y, x]
+    err_img = np.abs(It1_patch - It_patch)
+    err_img[valid_warp==False] = 0
+
+    mask[y, x] = (err_img > tolerance)
+
+    # mask = binary_erosion(mask)
+    mask = binary_dilation(mask)
+
+    return mask

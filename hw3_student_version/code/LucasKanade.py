@@ -45,16 +45,20 @@ def LucasKanade(It, It1, rect, threshold, num_iters, p0=np.zeros(2)):
         error_img = template - I_w
 
         # compute image gradient of warped image
-        I_x = np.array([img_interpolate.ev(warped_coords[1, :], warped_coords[0, :], dy=1)]).T
         I_y = np.array([img_interpolate.ev(warped_coords[1, :], warped_coords[0, :], dx=1)]).T
+        I_x = np.array([img_interpolate.ev(warped_coords[1, :], warped_coords[0, :], dy=1)]).T
         image_gradient = np.hstack((I_x, I_y))
         
         # compute jacobian * image gradient
         J = np.eye(2) # only two warp parameters: p1, p2 --> W(x ; p) : [[x + p1], [y + p2]]
         J_gradient_img = image_gradient @ J
 
+        H = J_gradient_img.T @ J_gradient_img
+        '''
         # compute delta p
         delta_p = np.linalg.lstsq(J_gradient_img, error_img, rcond=-1)[0]
+        '''
+        delta_p = np.linalg.inv(H) @ J_gradient_img.T @ error_img
         if np.linalg.norm(delta_p) <= threshold:
             break
         
