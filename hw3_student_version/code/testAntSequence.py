@@ -16,7 +16,6 @@ threshold = args.threshold
 tolerance = args.tolerance
 
 seq = np.load('../data/antseq.npy')
-print(seq.shape)
 
 num_frames = seq.shape[2]
 
@@ -41,14 +40,12 @@ for frame in range(num_frames - 1):
         x, y = locs[coor]
         ax.add_patch(patches.Rectangle((y - 2, x - 2), 4, 4, color='blue', fill=True))
     
-    #x, y = locs[:, 0], locs[:, 1]
-    #ax.add_patch(patches.Rectangle((y - 2, x - 2), 4, 4, color='blue', fill=True))
     ax.axis('off')
     plt.imshow(It1, cmap='gray')
 
     # report tracking performance
-    if frame != 0 and ((frame == 1) or ((frame + 1) % 30 == 0)):
-        img_name = f'frame_ant_{frame}.jpg'
+    if ((frame + 1) % 30 == 0):
+        img_name = f'frame_ant_{frame + 1}.jpg'
         plt.savefig(img_name)
     plt.pause(0.01)
     ax.clear()
