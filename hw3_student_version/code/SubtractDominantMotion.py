@@ -1,7 +1,6 @@
 import numpy as np
 
 from LucasKanadeAffine import LucasKanadeAffine
-from scipy.ndimage import affine_transform
 from scipy.ndimage import binary_erosion, binary_dilation
 from scipy.interpolate import RectBivariateSpline
 
@@ -19,63 +18,59 @@ def SubtractDominantMotion(image1, image2, threshold, num_iters, tolerance):
     mask = np.ones(image1.shape, dtype=bool)
 
     # calculate M (affine transformation matrix)
-    '''
+    
     M = LucasKanadeAffine(image1, image2, threshold, num_iters)
     
     # spline 
     image1_spline = RectBivariateSpline(np.arange(image1.shape[0]), np.arange(image1.shape[1]), image1)
     image2_spline = RectBivariateSpline(np.arange(image2.shape[0]), np.arange(image2.shape[1]), image2)
+    
     # create 3D matrix of homogenous coordinates in image1
     rows = np.arange(image1.shape[0])
     cols = np.arange(image1.shape[1])
-    grid_y, grid_x = np.meshgrid(cols, rows)
+    grid_y, grid_x = np.meshgrid(rows, cols)
     grid = np.stack((grid_x, grid_y, np.ones(grid_x.shape)), axis=-1)
     homogenous_coords = grid.reshape(-1, 3).T
 
     # calculate warped coordinates
-    warped_coords = M @ homogenous_coords
+    warped_coords = np.linalg.inv(M) @ homogenous_coords
     
-    # put warped coordinates in a grid (rows x cols x 2)
-    warped_grid = warped_coords[:2, :].T.reshape(len(rows), len(cols), 2)
+    # put warped coordinates in a grid (cols x rows x 3)
+    warped_grid = warped_coords.T.reshape(image1.shape[1], image1.shape[0], 3)
 
-    # retrieve warped pixel values
-    image1_w = image2_spline.ev(warped_grid[:, :, 1], warped_grid[:, :, 0])
+    # convert homogenous coordinates in grid to heterogenous
+    warped_grid[:, :, 0] /= warped_grid[:, :, 2]
+    warped_grid[:, :, 1] /= warped_grid[:, :, 2]
 
-    # retrieve coordinates in warped image that exceed image boundaries
-    x_thresh = len(rows)
-    y_thresh = len(cols)
-    i = np.where((warped_coords[0] <= x_thresh) & (warped_coords[0] >= 0) & (warped_coords[1] >= 0) | (warped_coords[1] <= y_thresh))[0]
-    valid_coords = warped_coords[:, i]
-
-    # find matching not valid coords in image1
-    valid_coords_img1 = (np.linalg.inv(M) @ valid_coords).T[:, :-1]
-
-    # grid of valid coords
-    valid_coords_grid = valid_coords_img1.T.reshape(image1.shape[0], image1.shape[1], 2)
+    # retrieve coordinates in warped image that don't image boundaries
+    x_thresh = len(cols)
+    y_thresh = len(rows)
+    valid_warp_grid = (warped_grid[:, :, 0] < x_thresh) & (warped_grid[:, :, 0] >= 0) & (warped_grid[:, :, 1] >= 0) & (warped_grid[:, :, 1] <= y_thresh)
 
     # retrieve valid coordinate values in image1
-    image1_valid = image1_spline.ev(valid_coords_grid[:, :, 1], valid_coords_grid[:, :, 0])
+    image1_patch = image1_spline.ev(valid_warp_grid[:, :, 1], valid_warp_grid[:, :, 0])
 
-    # warp new image 1
-    image1_w = affine_transform(image1_valid, np.linalg.norm(M))
+    # retrieve valid coordinate values in image2
+    image2_patch = image2[grid_y, grid_x]
 
     # find absolute difference
-    diff = np.abs(image2 - image1_w)
+    diff = np.abs(image2_patch - image1_patch)
 
-    # mask the difference (place 1 where diff > tolerance)
-    mask = diff > tolerance
-
-    structuring_element = np.ones((3, 3))
+    # set locations where valid coordinates are to 0
+    diff[valid_warp_grid == False] = 0
+    
+    # set locations where difference exceeds tolerance to 1
+    mask[grid_y, grid_x] = diff > tolerance
 
     # erode mask (shrink dark regions and enlarge light regions)
-    mask = binary_erosion(mask)
+    #mask = binary_erosion(mask)
 
     # dilate mask (enlarge dark regions and shrink light regions)
     mask = binary_dilation(mask)
 
     return mask
+    
     '''
-
     M = LucasKanadeAffine(image1, image2, threshold, num_iters)
     M = M[:2,:]
     M = np.concatenate([M, np.array([0,0,1])[np.newaxis,:]])
@@ -109,5 +104,6 @@ def SubtractDominantMotion(image1, image2, threshold, num_iters, tolerance):
 
     # mask = binary_erosion(mask)
     mask = binary_dilation(mask)
-
+    
     return mask
+    '''
