@@ -54,7 +54,10 @@ def LucasKanade(It, It1, rect, threshold, num_iters, p0=np.zeros(2)):
         J_gradient_img = image_gradient @ J
 
         H = J_gradient_img.T @ J_gradient_img
-       
+        '''
+        # compute delta p
+        delta_p = np.linalg.lstsq(J_gradient_img, error_img, rcond=-1)[0]
+        '''
         delta_p = np.linalg.inv(H) @ J_gradient_img.T @ error_img
         if np.linalg.norm(delta_p) <= threshold:
             break
