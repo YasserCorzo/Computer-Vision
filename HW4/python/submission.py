@@ -28,7 +28,7 @@ def eightpoint(pts1, pts2, M):
             x_i, y_i = pts1[i, 0], pts1[i, 1]
             x_i_prime, y_i_prime = pts2[i, 0], pts2[i, 1]
             U.append([x_i_prime*x_i, x_i_prime*y_i, x_i_prime, y_i_prime*x_i, y_i_prime*y_i, y_i_prime, x_i, y_i, 1])
-            #U.append([x_i*x_i_prime, x_i*y_i_prime, x_i, y_i*x_i_prime, y_i*y_i_prime, y_i, x_i_prime, y_i_prime, 1])
+            
         U = np.array(U)
         return U
     
@@ -74,12 +74,11 @@ def eightpoint(pts1, pts2, M):
     
     # enforce rank 2 constraint (not any F can be a fundamental matrix)
     F_norm = enforce_rank_2_constraint(F_norm)
-    F_norm = refineF(F_norm, pts1, pts2)
     
     # unscale normalized fundamental matrix
     F = (T.T @ F_norm) @ T
     
-    np.savez('q2 1', F, M)
+    np.savez('q2_1', F, M)
     return F
 '''
 Q3.1: Compute the essential matrix E.
@@ -89,8 +88,9 @@ Q3.1: Compute the essential matrix E.
     Output: E, the essential matrix
 '''
 def essentialMatrix(F, K1, K2):
-    # Replace pass by your implementation
-    pass
+    # derived from: F = K2^(-T) * E * K1^(-1)
+    E = K2.T @ F @ K1
+    return E
 
 
 '''

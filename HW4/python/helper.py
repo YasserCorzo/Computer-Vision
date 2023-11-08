@@ -87,7 +87,7 @@ def displayEpipolarF(I1, I2, F):
     while True:
         plt.sca(ax1)
         x, y = plt.ginput(1, timeout=3600, mouse_stop=2)[0]
-
+        
         xc = x
         yc = y
         v = np.array([xc, yc, 1])
@@ -111,7 +111,7 @@ def displayEpipolarF(I1, I2, F):
             ys = -(l[0] * xs + l[2])/l[1]
 
         # plt.plot(x,y, '*', 'MarkerSize', 6, 'LineWidth', 2);
-        ax1.plot(x, y, '*', MarkerSize=6, linewidth=2)
+        ax1.plot(x, y, '*', markersize=6, linewidth=2)
         ax2.plot([xs, xe], [ys, ye], linewidth=2)
         plt.draw()
 
