@@ -4,6 +4,7 @@ Q4.2:
     2. Loads necessary files from ../data/ and visualizes 3D reconstruction using scatter
 '''
 import cv2
+import numpy as np
 
 from helper import *
 from submission import *

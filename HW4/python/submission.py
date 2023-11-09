@@ -4,9 +4,10 @@ Replace 'pass' by your implementation.
 """
 
 # Insert your package here
+import cv2
 import numpy as np
 
-from util import *
+from util import _singularize
 
 '''
 Q2.1: Eight Point Algorithm
@@ -41,16 +42,6 @@ def eightpoint(pts1, pts2, M):
         f = vh[-1]
         F = f.reshape(3, 3)
         return F 
-    
-    '''
-    Input:  F, fundamental matrix w/o rank 2 constraint, 3x3 matrix
-    Output: F_rank_2, true fundamental matrix with rank 2, 3x3 matrix
-    '''
-    def enforce_rank_2_constraint(F):
-        u, s, vh = np.linalg.svd(F, full_matrices=True, compute_uv=True, hermitian=False)
-        s[-1] = 0
-        F_rank_2 = (u @ np.diag(s)) @ vh
-        return F_rank_2
 
     # convert corresponding points to homogenous coordinates
     ones = np.ones(len(pts1))
@@ -73,7 +64,7 @@ def eightpoint(pts1, pts2, M):
     F_norm = compute_F(U)
     
     # enforce rank 2 constraint (not any F can be a fundamental matrix)
-    F_norm = enforce_rank_2_constraint(F_norm)
+    F_norm = _singularize(F_norm)
     
     # unscale normalized fundamental matrix
     F = (T.T @ F_norm) @ T
@@ -103,9 +94,61 @@ Q3.2: Triangulate a set of 2D coordinates in the image to a set of 3D points.
             err, the reprojection error.
 '''
 def triangulate(C1, pts1, C2, pts2):
-    # Replace pass by your implementation
-    pass
+    w = []
+    err = []
+    w_homogenous = []
 
+    # to build A: x1_i x P1 & x2_i x P2
+    # remember: a x b = [[a2b3 - a3b2], [a3b1 - a1b3], a1b2 - a2b1]
+    # in this case, x x C will yield 3 equations, one of which is redundant (a linear combination of the other two), and 4 variables
+    # the variables: y*c3, c2, c1, x*c3 (ci is row i of camera matrix)
+    # source: https://www.cs.cmu.edu/~16385/s17/Slides/11.4_Triangulation.pdf
+
+    # get rows of camera matrix 1
+    c1 = C1[0, :]
+    c2 = C1[1, :]
+    c3 = C1[2, :]
+
+    # get rows of camera matrix 2
+    c1_2 = C2[0, :]
+    c2_2 = C2[1, :]
+    c3_2 = C2[2, :]
+
+    # solve for w
+    for i in range(len(pts1)):
+        x1_i, y1_i = pts1[i, :]
+        x2_i, y2_i = pts2[i, :]
+    
+        A1_i = np.array((y1_i*c3 - c2, c1 - x1_i*c3))
+        A2_i = np.array((y2_i*c3_2 - c2_2, c1_2 - x2_i*c3_2))
+        
+        A_i = np.vstack((A1_i, A2_i))
+      
+        # use SVD to solve for A_i * w_i = 0
+        u, s, vh = np.linalg.svd(A_i, full_matrices=True, compute_uv=True, hermitian=False)
+        w_i_homogenous = vh[-1]
+        
+        # convert homogenous w_i to heterogenous w_i (x, y, z)
+        w_i = w_i_homogenous[:-1] / w_i_homogenous[-1]
+        w.append(w_i)
+        w_homogenous.append(w_i_homogenous)
+        
+    w = np.array(w)
+    w_homogenous = np.array(w_homogenous)
+
+    proj1 = (C1 @ w_homogenous.T).T
+    proj2 = (C2 @ w_homogenous.T).T
+
+    pts1_hat = proj1[:, :-1] / proj1[:, -1].reshape(-1, 1)
+    pts2_hat = proj2[:, :-1] / proj2[:, -1].reshape(-1, 1)
+
+    err1 = np.square(np.linalg.norm(pts1 - pts1_hat, axis=1))
+    err2 = np.square(np.linalg.norm(pts2 - pts2_hat, axis=1))
+    
+    # calculate total reprojection error
+    err = (err1 + err2).sum()
+
+    return w, err
 
 '''
 Q4.1: 3D visualization of the temple images.
@@ -119,8 +162,56 @@ Q4.1: 3D visualization of the temple images.
 
 '''
 def epipolarCorrespondence(im1, im2, F, x1, y1):
-    # Replace pass by your implementation
-    pass
+    def window_center_coord(size):
+        return (int(size / 2), int(size / 2))
+
+    def epipolar_line_pts(im2, point, F):
+        candidate_points = []
+        l_prime = F @ point.reshape(-1, 1)
+        a = l_prime.T[0]
+        b = l_prime.T[1]
+        c = l_prime.T[2]
+        for x in range(im2.shape[1]):
+            y = (-a*x - c)/b 
+            y = round(y)
+            if y < im2.shape[0] and y >=0:
+                candidate_points.append([x, y])
+        
+        candidate_points = np.array(candidate_points)
+
+        return candidate_points
+
+    window_size = 5
+    window_center = window_center_coord(window_size)
+    paddingX = window_size // 2
+    paddingY = window_size // 2
+    # convert to greyscale to pad
+    if (im1.ndim == 3):
+        im1 = cv2.cvtColor(im1,cv2.COLOR_BGR2GRAY)
+        
+    im1 = np.float32(im1) / 255
+
+    if (im2.ndim == 3):
+        im2 = cv2.cvtColor(im2,cv2.COLOR_BGR2GRAY)
+        
+    im2 = np.float32(im2) / 255
+
+    paddedImg1 = np.pad(im1, pad_width=((paddingX,),(paddingY,)), mode='edge')
+    paddedImg2 = np.pad(im2, pad_width=((paddingX,),(paddingY,)), mode='edge')
+    x2 = []
+    y2 = []
+    for (x1_i, y1_i) in (x1, y1):
+        # find corresponding points that lie on epipolar line
+        pt1 = np.array([x1_i, y1_i, 1])
+        correspondences = epipolar_line_pts(im2, pt1, F)
+
+        # obtain window in image 1
+
+        # obtain windows for points on epipolar line in image 2
+
+        # choose corresponding point in image 2 whose window has with the smallest euclidean distance
+        
+    return x2, y2
 
 '''
 Q5.1: Extra Credit RANSAC method.
