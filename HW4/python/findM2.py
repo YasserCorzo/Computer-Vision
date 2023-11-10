@@ -45,10 +45,18 @@ w4, err4 = triangulate(C1, pts1, K2 @ M2s[:, :, 3], pts2)
 
 print(err1, err2, err3, err4)
 
-# return M2 that has lowest triangulate error
+# return M2 that has lowest triangulate error and where projected 3D z-coordinates
+# is positive
 l = [(err1, 0), (err2, 1), (err3, 2), (err4, 3)]
+ws = [w1, w2, w3, w4]
+M2 = None
+for (err, i) in l:
+    min_error = float('inf')
+    w_i = ws[i]
+    if err < min_error and np.all(w_i[:, 2] > 0):
+        min_error = err
+        M2 = M2s[:, :, i]
 
-M2 = M2s[:, :, min(l)[1]]
 np.savez('q3_3', M2)
 
 
