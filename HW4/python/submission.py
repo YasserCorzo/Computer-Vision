@@ -187,70 +187,26 @@ def epipolarCorrespondence(im1, im2, F, x1, y1):
         windowed_img = img[y-cy : y+cy+1, x-cx : x+cx+1]
         return windowed_img
 
-    window_size = 31
+    window_size = 45
     window_center = window_center_coord(window_size)
     paddingX = window_size // 2
     paddingY = window_size // 2
+    
     # convert to greyscale to pad
     if (im1.ndim == 3):
         im1 = cv2.cvtColor(im1,cv2.COLOR_BGR2GRAY)
-        
-    im1 = np.float32(im1) / 255
 
     if (im2.ndim == 3):
         im2 = cv2.cvtColor(im2,cv2.COLOR_BGR2GRAY)
-        
+    
+    # normalize grey images
+    im1 = np.float32(im1) / 255 
     im2 = np.float32(im2) / 255
-
+    
+    im1 = gaussian_filter(im1, sigma=2, output=np.float64)
+    im2 = gaussian_filter(im2, sigma=2, output=np.float64)
     paddedImg1 = np.pad(im1, pad_width=((paddingX,),(paddingY,)), mode='edge')
     paddedImg2 = np.pad(im2, pad_width=((paddingX,),(paddingY,)), mode='edge')
-    x2 = []
-    y2 = []
-    '''
-    pts1 = np.array([[x1, y1]])
-    for i in range(len(pts1)):
-        # find corresponding points that lie on epipolar line
-        x1_i, y1_i = pts1[i, :]
-        pt1 = np.array([x1_i, y1_i, 1])
-        epipolar_pts = epipolar_line_pts(im2, pt1, F)
-
-        # obtain window in image 1 (padded)
-        padded_y1_i = y1_i + paddingY
-        padded_x1_i = x1_i + paddingX
-        window1 = window(padded_y1_i, padded_x1_i, paddedImg1, window_center)
-        
-        # apply gaussian filter to window 1
-        window1 = gaussian_filter(window1, 3)
-        
-        # score for euclidean distance
-        euclidean_score = float('inf')
-        
-        # keep track of (x, y) coordinate that has best window similarity
-        best_x2_i = None
-        best_y2_i = None
-        
-        # obtain windows for points on epipolar line in image 2
-        for i in range(len(epipolar_pts)):
-            x2_i, y2_i = epipolar_pts[i, :]
-            
-            # obtain window in image 2 (padded)
-            padded_y2_i = y2_i + paddingY
-            padded_x2_i = x2_i + paddingX
-            window2 = window(padded_y2_i, padded_x2_i, paddedImg2, window_center)
-            
-            # apply gaussian filter to window 2
-            window2 = gaussian_filter(window2, 3)
-            
-            # choose corresponding point in image 2 whose window has with the smallest euclidean distance
-            score = np.sum(np.square(window1 - window1))
-            if score < euclidean_score:
-                euclidean_score = score
-                best_x2_i = x2_i
-                best_y2_i = y2_i
-        
-        x2.append(best_x2_i)
-        y2.append(best_y2_i)
-    '''
 
     pt1 = np.array([x1, y1, 1])
     epipolar_pts = epipolar_line_pts(im2, pt1, F)
@@ -259,9 +215,6 @@ def epipolarCorrespondence(im1, im2, F, x1, y1):
     padded_y1_i = y1 + paddingY
     padded_x1_i = x1 + paddingX
     window1 = window(padded_y1_i, padded_x1_i, paddedImg1, window_center)
-    
-    # apply gaussian filter to window 1
-    window1 = gaussian_filter(window1, 0.5)
     
     # score for euclidean distance
     euclidean_score = float('inf')
@@ -278,9 +231,6 @@ def epipolarCorrespondence(im1, im2, F, x1, y1):
         padded_y2_i = y2_i + paddingY
         padded_x2_i = x2_i + paddingX
         window2 = window(padded_y2_i, padded_x2_i, paddedImg2, window_center)
-        
-        # apply gaussian filter to window 2
-        window2 = gaussian_filter(window2, 0.5)
         
         # choose corresponding point in image 2 whose window has with the smallest euclidean distance
         score = np.sum(np.square(window1 - window2))
