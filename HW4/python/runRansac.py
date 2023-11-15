@@ -18,7 +18,9 @@ M = max(img1.shape[0], img1.shape[1])
 
 # calculate F (without RANSAC)
 F = eightpoint(pts1, pts2, M)
+print(F)
 
 # calculate F with ransac
 F_ransac, inliers = ransacF(pts1, pts2, M, tol=0.67)
+print(F_ransac)
 print(inliers.sum())

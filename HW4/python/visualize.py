@@ -76,12 +76,14 @@ l = [(err1, 0), (err2, 1), (err3, 2), (err4, 3)]
 ws = [w1, w2, w3, w4]
 w = None
 min_error = float('inf')
+idx = None
 for (err, i) in l:
     w_i = ws[i]
     if np.all(w_i[:, -1] > 0):
         min_error = err
         w = w_i
-        
+        idx = i
+np.savez('q4_2', F=F, M1=np.hstack((np.eye(3), np.zeros(3).reshape(-1, 1))), M2=M2s[:, :, idx], C1=C1, C2=K2 @ M2s[:, :, idx])
 # scatter plot temple 3D coordinates
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')

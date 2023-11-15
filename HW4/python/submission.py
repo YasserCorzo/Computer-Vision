@@ -4,6 +4,7 @@ Replace 'pass' by your implementation.
 """
 
 # Insert your package here
+import trace
 import cv2
 import numpy as np
 
@@ -70,7 +71,7 @@ def eightpoint(pts1, pts2, M):
     # unscale normalized fundamental matrix
     F = (T.T @ F_norm) @ T
     
-    np.savez('q2_1', F, M)
+    #np.savez('q2_1', F, M)
     return F
 '''
 Q3.1: Compute the essential matrix E.
@@ -318,11 +319,44 @@ Q5.2:Extra Credit  Inverse Rodrigues formula.
     Output: r, a 3x1 vector
 '''
 def invRodrigues(R):
+    '''
     theta = np.arccos((np.trace(R) - 1) / 2)
     w = (1 / (2 * np.sin(theta))) * np.array(([R[2, 1] - R[1, 2]],
                                               [R[0, 2] - R[2, 0]], 
                                               [R[1, 0] - R[0, 2]]))  
     r = theta * w
+    '''
+    # source: https://courses.cs.duke.edu/cps274/fall13/notes/rodrigues.pdf
+    A = (R - R.T) / 2
+    rho = np.array([A[2, 1], A[0, 2], A[1, 0]]).reshape(-1, 1)
+    s = np.linalg.norm(rho)
+    c = (np.trace(R) - 1) / 2
+    if (s == 0) and (c == 1):
+        r = np.zeros((3, 1))
+    
+    elif (s == 0) and (c == -1):
+        # let v be a non-zero column of R + I
+        v_temp = R + np.eye(len(R))
+        v = None
+        for j in range(v_temp.shape[1]):
+            # check whether column j is non-zero
+            col = v_temp[:, j]
+            if np.all(col != 0):
+                v = col
+                break
+        u = v / np.linalg.norm(v)
+        r = u * np.pi
+        # modeled after function S_1/2
+        if (np.linalg.norm(r) == np.pi) and ((r[0] == 0 and r[1] == 0 and r[2] < 0) 
+            or (r[0] == 0 and r[1] < 0) or (r[0] < 0)):
+            r = -r
+        r = r.reshape((3, 1))
+        
+    theta = np.arccos((np.trace(R) - 1) / 2)
+    if (np.sin(theta) != 0):
+        u = rho / s
+        theta = np.arctan2(s, c)
+        r = u * theta 
     return r
 
 '''
@@ -339,15 +373,31 @@ def rodriguesResidual(K1, M1, p1, K2, p2, x):
     # retrieve number of 2D coordinates
     N = p1.shape[0]
 
-    # don't know how to break up x into 3D coords P, r2, and t2
-
+    # break up x into 3D coords P, r2, and t2
+    t2 = x[-3:].reshape(3, 1)
+    r2 = x[-6:-3].reshape(3, 1)
+    P = x[:3 * N].reshape(N, 3)
+    
+    # make 3D coordinate homogenous (N x 4)
+    P_homogenous = np.hstack((P, np.ones(N).reshape(-1, 1)))
+    
     # after getting r2, get R2 (with Rodriguez function)
-
+    R2 = rodrigues(r2)
+    
     # after getting R2, get M2 = [R2 | t2]
+    M2 = np.hstack((R2, t2))
 
     # get C1 (K1 @ M1) and C2 (K2 @ M2)
-
+    C1 = K1 @ M1
+    C2 = K2 @ M2
+    
     # calculate p1_hat and p2_hat (multiply Ci @ 3D coords) 
+    p1_hat_homogenous = (C1 @ P_homogenous.T).T
+    p2_hat_homogenous = (C2 @ P_homogenous.T).T
+
+    # convert homogenous coordinates to heterogenous
+    p1_hat = p1_hat_homogenous[:, :-1] / p1_hat_homogenous[:,-1].reshape(-1, 1)
+    p2_hat = p2_hat_homogenous[:, :-1] / p2_hat_homogenous[:, -1].reshape(-1, 1)
 
     residuals = np.concatenate([(p1-p1_hat).reshape([-1]), (p2-p2_hat).reshape([-1])])
     return residuals

@@ -33,30 +33,30 @@ assert np.isscalar(x2) & np.isscalar(y2), 'epipolarCoorespondence returns x & y 
 """
 You can opt to uncomment this if extra credit q5 is implemented. Note this only checks formatting. 
 """
-# F, inliers = sub.ransacF(data['pts1'], data['pts2'], M)
-# assert F.shape == (3, 3), 'ransacF returns 3x3 matrix'
+F, inliers = sub.ransacF(data['pts1'], data['pts2'], M)
+assert F.shape == (3, 3), 'ransacF returns 3x3 matrix'
 
 # # 5.2
-# r = np.ones([3, 1])
-# R = sub.rodrigues(r)
-# assert R.shape == (3, 3), 'rodrigues returns 3x3 matrix'
+r = np.ones([3, 1])
+R = sub.rodrigues(r)
+assert R.shape == (3, 3), 'rodrigues returns 3x3 matrix'
 
-# R = np.eye(3);
-# r = sub.invRodrigues(R)
-# assert (r.shape == (3, )) | (r.shape == (3, 1)), 'invRodrigues returns 3x1 vector'
+R = np.eye(3);
+r = sub.invRodrigues(R)
+assert (r.shape == (3, )) | (r.shape == (3, 1)), 'invRodrigues returns 3x1 vector'
 
 # # 5.3
-# K1 = np.random.rand(3, 3)
-# K2 = np.random.rand(3, 3)
-# M1 = np.concatenate([np.random.rand(3, 3), np.ones([3, 1])], axis=1)
-# M2 = np.concatenate([np.random.rand(3, 3), np.ones([3, 1])], axis=1)
-# r2 = np.ones(3)
-# t2 = np.ones(3)
-# x = np.concatenate([P.reshape([-1]), r2, t2])
-# residuals = sub.rodriguesResidual(K1, M1, data['pts1'], K2, data['pts1'], x)
-# print(residuals.shape)
-# print(N)
-# assert residuals.shape == (4 * N,), 'rodriguesResidual returns vector of size 4N'
+K1 = np.random.rand(3, 3)
+K2 = np.random.rand(3, 3)
+M1 = np.concatenate([np.random.rand(3, 3), np.ones([3, 1])], axis=1)
+M2 = np.concatenate([np.random.rand(3, 3), np.ones([3, 1])], axis=1)
+r2 = np.ones(3)
+t2 = np.ones(3)
+x = np.concatenate([P.reshape([-1]), r2, t2])
+residuals = sub.rodriguesResidual(K1, M1, data['pts1'], K2, data['pts1'], x)
+print(residuals.shape)
+print(N)
+assert residuals.shape == (4 * N,), 'rodriguesResidual returns vector of size 4N'
 
 # M2, P = sub.bundleAdjustment(K1, M1, data['pts1'], K2, M2, data['pts1'], P)
 # assert M2.shape == (3, 4), 'bundleAdjustment returns 3x4 matrix M'

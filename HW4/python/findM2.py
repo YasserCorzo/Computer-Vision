@@ -50,13 +50,17 @@ print(err1, err2, err3, err4)
 l = [(err1, 0), (err2, 1), (err3, 2), (err4, 3)]
 ws = [w1, w2, w3, w4]
 M2 = None
+idx = None
 for (err, i) in l:
     min_error = float('inf')
     w_i = ws[i]
     if err < min_error and np.all(w_i[:, 2] > 0):
         min_error = err
         M2 = M2s[:, :, i]
-
-np.savez('q3_3', M2)
+        idx = i
+print('M2:', M2)
+print('C2:', K2 @ M2s[:, :, idx])
+print('P:', ws[idx])
+np.savez('q3_3', M2, C2=K2 @ M2s[:, :, idx], P=ws[idx])
 
 
