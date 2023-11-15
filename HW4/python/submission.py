@@ -187,7 +187,7 @@ def epipolarCorrespondence(im1, im2, F, x1, y1):
         windowed_img = img[y-cy : y+cy+1, x-cx : x+cx+1]
         return windowed_img
 
-    window_size = 45
+    window_size = 225
     window_center = window_center_coord(window_size)
     paddingX = window_size // 2
     paddingY = window_size // 2
@@ -203,8 +203,9 @@ def epipolarCorrespondence(im1, im2, F, x1, y1):
     im1 = np.float32(im1) / 255 
     im2 = np.float32(im2) / 255
     
-    im1 = gaussian_filter(im1, sigma=2, output=np.float64)
-    im2 = gaussian_filter(im2, sigma=2, output=np.float64)
+    im1 = gaussian_filter(im1, sigma=1)
+    im2 = gaussian_filter(im2, sigma=1)
+    
     paddedImg1 = np.pad(im1, pad_width=((paddingX,),(paddingY,)), mode='edge')
     paddedImg2 = np.pad(im2, pad_width=((paddingX,),(paddingY,)), mode='edge')
 
@@ -233,12 +234,12 @@ def epipolarCorrespondence(im1, im2, F, x1, y1):
         window2 = window(padded_y2_i, padded_x2_i, paddedImg2, window_center)
         
         # choose corresponding point in image 2 whose window has with the smallest euclidean distance
-        score = np.sum(np.square(window1 - window2))
+        score = np.sqrt(np.sum(np.square(window1 - window2)))
         if score < euclidean_score:
             euclidean_score = score
             best_x2 = x2_i
             best_y2 = y2_i
-    
+        
     x2, y2 = best_x2, best_y2
     return x2, y2
 
@@ -252,25 +253,77 @@ Q5.1: Extra Credit RANSAC method.
 '''
 def ransacF(pts1, pts2, M, nIters=1000, tol=0.42):
     # Replace pass by your implementation
-    pass
+    inliers = None
+    max_num_inliers = float('-inf')
 
+    # make points homogenous
+    pts1_homogenous = np.hstack((pts1, np.ones(len(pts1)).reshape(-1, 1)))
+    pts2_homogenous = np.hstack((pts2, np.ones(len(pts2)).reshape(-1, 1)))
+
+    for iter in range(nIters):
+        # draw set with minimum number of correspondences (7 points)
+        i = np.random.randint(0, len(pts1), 7)
+        pts1_rand = pts1[i]
+        pts2_rand = pts2[i]
+
+        # fit F to set
+        curr_F = eightpoint(pts1_rand, pts2_rand, M)
+    
+        # retrieve fitted epipolar line
+        l_prime = (curr_F @ pts1_homogenous.T).T
+
+        # calculate distances between every pt2 and the fitted epipolar line
+        dist = []
+        for i in range(len(pts1)):
+            pts2_i = pts2_homogenous[i, :]
+            l_i = l_prime[i, :]
+
+            # use geometric distance
+            dist_i = np.dot(pts2_i, l_i) / np.sqrt(l_i[0]**2 + l_i[1]**2)
+            dist.append(dist_i)
+        dist = np.array(dist)
+        
+        inliers = dist < tol
+        curr_num_inliers = inliers.sum()
+
+        if curr_num_inliers > max_num_inliers:
+            max_num_inliers = curr_num_inliers
+            inliers = np.argwhere(dist)
+
+    F = eightpoint(pts1[inliers.flatten()], pts2[inliers.flatten()], M)
+    return F, inliers
+    
 '''
 Q5.2:Extra Credit  Rodrigues formula.
     Input:  r, a 3x1 vector
     Output: R, a rotation matrix
 '''
 def rodrigues(r):
-    # Replace pass by your implementation
-    pass
-
+    theta = np.linalg.norm(r)
+    I = np.eye(3)
+    if theta == 0:
+        return I
+    r = r / theta
+    kx = r[0, 0]
+    ky = r[1, 0]
+    kz = r[2, 0]
+    K = np.array(([0, -kz, ky],
+                  [kz, 0, -kx],
+                  [-ky, kx, 0]))
+    return I*np.cos(theta) + (1 - np.cos(theta))*(r @ r.T) + K*np.sin(theta)
+    
 '''
 Q5.2:Extra Credit  Inverse Rodrigues formula.
     Input:  R, a rotation matrix
     Output: r, a 3x1 vector
 '''
 def invRodrigues(R):
-    # Replace pass by your implementation
-    pass
+    theta = np.arccos((np.trace(R) - 1) / 2)
+    w = (1 / (2 * np.sin(theta))) * np.array(([R[2, 1] - R[1, 2]],
+                                              [R[0, 2] - R[2, 0]], 
+                                              [R[1, 0] - R[0, 2]]))  
+    r = theta * w
+    return r
 
 '''
 Q5.3: Extra Credit Rodrigues residual.
@@ -283,8 +336,21 @@ Q5.3: Extra Credit Rodrigues residual.
     Output: residuals, 4N x 1 vector, the difference between original and estimated projections
 '''
 def rodriguesResidual(K1, M1, p1, K2, p2, x):
-    # Replace pass by your implementation
-    pass
+    # retrieve number of 2D coordinates
+    N = p1.shape[0]
+
+    # don't know how to break up x into 3D coords P, r2, and t2
+
+    # after getting r2, get R2 (with Rodriguez function)
+
+    # after getting R2, get M2 = [R2 | t2]
+
+    # get C1 (K1 @ M1) and C2 (K2 @ M2)
+
+    # calculate p1_hat and p2_hat (multiply Ci @ 3D coords) 
+
+    residuals = np.concatenate([(p1-p1_hat).reshape([-1]), (p2-p2_hat).reshape([-1])])
+    return residuals
 
 '''
 Q5.3 Extra Credit  Bundle adjustment.
