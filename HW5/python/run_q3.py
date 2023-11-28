@@ -6,14 +6,19 @@ from nn import *
 
 train_data = scipy.io.loadmat('../data/nist36_train.mat')
 valid_data = scipy.io.loadmat('../data/nist36_valid.mat')
+test_data = scipy.io.loadmat('../data/nist36_test.mat')
 
 train_x, train_y = train_data['train_data'], train_data['train_labels']
 valid_x, valid_y = valid_data['valid_data'], valid_data['valid_labels']
+
+test_x, test_y = test_data['test_data'], test_data['test_labels']
 
 max_iters = 80
 # pick a batch size, learning rate
 batch_size = 32
 learning_rate = 1e-3
+#learning_rate = 1e-3 * 10
+#learning_rate = 1e-3 * 0.1
 hidden_size = 64
 ##########################
 ##### your code here #####
@@ -30,7 +35,20 @@ params = {}
 ##########################
 initialize_weights(train_x.shape[1], hidden_size, params, 'layer1')
 initialize_weights(hidden_size, train_y.shape[1], params, 'output')
+'''
+from mpl_toolkits.axes_grid1 import ImageGrid
 
+# Q3.3 visualize initial weights here
+
+fig = plt.figure()
+grid = ImageGrid(fig, 111, nrows_ncols=(8, 8), axes_pad=0.1)
+
+for i in range(hidden_size):
+    grid[i].imshow(np.reshape(params['Wlayer1'][:, i], (32, 32))) 
+    plt.axis('off')
+
+plt.show()
+'''
 training_entropy_loss = np.zeros(max_iters)
 training_acc = np.zeros(max_iters)
 
@@ -65,19 +83,20 @@ for itr in range(max_iters):
         params['blayer1'] = params['blayer1'] - (learning_rate * params['grad_blayer1'])
         params['Woutput'] = params['Woutput'] - (learning_rate * params['grad_Woutput'])
         params['boutput'] = params['boutput'] - (learning_rate * params['grad_boutput'])
-        
+    
     total_acc /= batch_num
+    total_loss /= batch_num
     
     training_entropy_loss[itr] = total_loss
     training_acc[itr] = total_acc
+    '''
+    valid_h1 = forward(valid_x, params, "layer1")
+    valid_probs = forward(valid_h1, params, "output", softmax)
+    val_loss, val_acc = compute_loss_and_acc(valid_y, valid_probs)
 
-    valid_forward_1 = forward(valid_x, params, "layer1")
-    valid_forward_2 = forward(valid_forward_1, params, "output", softmax)
-    val_loss, val_acc = compute_loss_and_acc(valid_y, valid_forward_2)
-
-    validation_entropy_loss[itr] = val_loss
+    validation_entropy_loss[itr] = val_loss / batch_num
     validation_acc[itr] = val_acc 
-    
+    '''
     if itr % 2 == 0:
         print("itr: {:02d} \t loss: {:.2f} \t acc : {:.2f}".format(itr,total_loss,total_acc))
 
@@ -92,9 +111,17 @@ valid_loss, valid_acc = compute_loss_and_acc(valid_y, v2)
 
 print('Validation accuracy: ',valid_acc)
 
+# Q3.2 computing test accuracy
+test_h1 = forward(test_x, params, "layer1")
+test_probs = forward(test_h1, params, "output", softmax)
+test_loss, test_acc = compute_loss_and_acc(test_y, test_probs)
+
+print('Test accuracy: ', test_acc)
+
 # plot validation and training accuracy
 epochs = np.arange(0, max_iters)
 
+'''
 plt.plot(epochs, validation_acc, label="validation accuracy")
 plt.plot(epochs, training_acc, label="training accuracy")
 plt.xlabel("epochs")
@@ -111,8 +138,22 @@ plt.ylabel("loss")
 plt.legend()
 plt.title("Train & Validation Loss")
 plt.show()
+'''
+'''
+# Q3.2
+plt.plot(epochs, training_acc)
+plt.xlabel("epochs")
+plt.ylabel("accuracy (%)")
+plt.title(f'Training Accuracy with lr={learning_rate}')
+plt.show()
 
-
+plt.figure()
+plt.plot(epochs, training_entropy_loss)
+plt.xlabel("epochs")
+plt.ylabel("loss")
+plt.title(f'Training Loss with lr={learning_rate}')
+plt.show()
+'''
 if False: # view the data
     for crop in xb:
         import matplotlib.pyplot as plt
@@ -132,13 +173,30 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 ##### your code here #####
 ##########################
 
+fig = plt.figure()
+grid = ImageGrid(fig, 111, nrows_ncols=(8, 8), axes_pad=0.1)
+
+for i in range(hidden_size):
+    grid[i].imshow(np.reshape(params['Wlayer1'][:, i], (32, 32))) 
+    plt.axis('off')
+
+plt.show()
+
 # Q3.4
 confusion_matrix = np.zeros((train_y.shape[1],train_y.shape[1]))
 
-# compute comfusion matrix here
+# compute confusion matrix here
 ##########################
 ##### your code here #####
 ##########################
+for i in range(test_y.shape[0]):
+    # get actual class of test set
+    actual_class = np.argmax(test_y[i, :])
+
+    # get predicted class from test set
+    pred_class = np.argmax(test_probs[i, :])
+
+    confusion_matrix[actual_class][pred_class] += 1
 
 import string
 plt.imshow(confusion_matrix,interpolation='nearest')

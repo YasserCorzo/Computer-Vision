@@ -145,15 +145,14 @@ def backwards(delta,params,name='',activation_deriv=sigmoid_deriv):
     # derivative of activation
     d_post_act = activation_deriv(post_act)
 
-    d_pre_act = X
-
     d_b = np.ones_like(b)
     d_b = d_b[np.newaxis, :]
     
-    grad_W = ((delta * d_post_act).T @ d_pre_act).T
+    grad_W = ((delta * d_post_act).T @ X).T
 
-    grad_b = ((delta.T @ d_post_act) @ d_b.T).T
-    grad_b = grad_b[0]
+    grad_b = np.sum(delta * d_post_act, axis=0)
+    #grad_b = ((delta.T @ d_post_act) @ d_b.T).T
+    #grad_b = grad_b[0]
 
     # N x 1
     grad_X = ((delta * d_post_act)) @ W.T

@@ -226,7 +226,18 @@ for k,v in params.items():
             
             # compute derivative with central diffs
             params["grad_" + k][i] = (loss_add - loss_sub) / (2 * eps)
-    
+
+# forward prop
+h1 = forward(x, params_orig, 'layer1')
+probs = forward(h1, params_orig, 'output', softmax)
+
+# calculate loss and add loss and accuracy
+loss, acc = compute_loss_and_acc(y, probs)
+
+# backward propagation
+delta1 = probs - y
+delta2 = backwards(delta1, params_orig, 'output' ,linear_deriv)
+backwards(delta2, params_orig, 'layer1', sigmoid_deriv)
     
 total_error = 0
 for k in params.keys():
