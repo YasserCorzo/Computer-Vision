@@ -17,4 +17,5 @@ def relu(x):
     return np.maximum(x,0)
 
 def relu_deriv(x):
-    return (x > 0).astype(np.float)
+    #return (x > 0).astype(np.float)
+    return (x > 0).astype(np.float64)

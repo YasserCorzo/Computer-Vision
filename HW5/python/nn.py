@@ -76,6 +76,7 @@ def softmax(x):
     ##########################
     ##### your code here #####
     ##########################
+    
     c = np.max(x, axis=1)
     
     # apply translation to x
@@ -85,6 +86,7 @@ def softmax(x):
     res = np.exp(x_translate)
     
     res = res / np.sum(res, axis=1).reshape(-1, 1)
+    
     return res
 
 ############################## Q 2.2.3 ##############################
@@ -144,18 +146,18 @@ def backwards(delta,params,name='',activation_deriv=sigmoid_deriv):
     
     # derivative of activation
     d_post_act = activation_deriv(post_act)
-
-    d_b = np.ones_like(b)
-    d_b = d_b[np.newaxis, :]
     
-    grad_W = ((delta * d_post_act).T @ X).T
+    #grad_W = ((delta * d_post_act).T @ X).T
+    #print(X.shape)
+    #print("shape of delta:", (delta * d_post_act).shape)
+    grad_W = X.T @ (delta * d_post_act)
+    #print("grad w:", grad_W.shape)
 
     grad_b = np.sum(delta * d_post_act, axis=0)
-    #grad_b = ((delta.T @ d_post_act) @ d_b.T).T
-    #grad_b = grad_b[0]
-
+    #print("grad b:", grad_b.shape)
     # N x 1
     grad_X = ((delta * d_post_act)) @ W.T
+    #print("grad x:", grad_X.shape)
     
     # store the gradients
     params['grad_W' + name] = grad_W

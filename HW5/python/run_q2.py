@@ -136,16 +136,6 @@ for itr in range(max_iters):
 ##### your code here #####
 ##########################
 
-'''
-# perform forward propagation on that batch
-h1 = forward(x,params,'layer1')
-probs = forward(h1,params,'output',softmax)
-        
-# backward propagation
-delta1 = probs - y
-delta2 = backwards(delta1,params,'output',linear_deriv)
-delta3 = backwards(delta2,params,'layer1',sigmoid_deriv)
-'''
 # save the old params
 import copy
 params_orig = copy.deepcopy(params)

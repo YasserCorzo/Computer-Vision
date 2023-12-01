@@ -11,11 +11,14 @@ test_data = scipy.io.loadmat('../data/nist36_test.mat')
 train_x, train_y = train_data['train_data'], train_data['train_labels']
 valid_x, valid_y = valid_data['valid_data'], valid_data['valid_labels']
 
+#plt.imshow(train_x[0].reshape(32, 32), cmap="Greys")
+#plt.show()
+
 test_x, test_y = test_data['test_data'], test_data['test_labels']
 
-max_iters = 80
+max_iters = 90
 # pick a batch size, learning rate
-batch_size = 32
+batch_size = 16
 learning_rate = 1e-3
 #learning_rate = 1e-3 * 10
 #learning_rate = 1e-3 * 0.1
@@ -85,18 +88,18 @@ for itr in range(max_iters):
         params['boutput'] = params['boutput'] - (learning_rate * params['grad_boutput'])
     
     total_acc /= batch_num
-    total_loss /= batch_num
+    total_loss /= train_x.shape[0]
     
-    training_entropy_loss[itr] = total_loss
+    training_entropy_loss[itr] = total_loss 
     training_acc[itr] = total_acc
-    '''
+
     valid_h1 = forward(valid_x, params, "layer1")
     valid_probs = forward(valid_h1, params, "output", softmax)
     val_loss, val_acc = compute_loss_and_acc(valid_y, valid_probs)
 
-    validation_entropy_loss[itr] = val_loss / batch_num
+    validation_entropy_loss[itr] = val_loss / valid_x.shape[0]
     validation_acc[itr] = val_acc 
-    '''
+    
     if itr % 2 == 0:
         print("itr: {:02d} \t loss: {:.2f} \t acc : {:.2f}".format(itr,total_loss,total_acc))
 
@@ -105,7 +108,7 @@ valid_acc = None
 ##########################
 ##### your code here #####
 ##########################
-v1 = forward (valid_x, params, "layer1")
+v1 = forward(valid_x, params, "layer1")
 v2 = forward(v1, params, "output", softmax)
 valid_loss, valid_acc = compute_loss_and_acc(valid_y, v2)
 
@@ -121,7 +124,7 @@ print('Test accuracy: ', test_acc)
 # plot validation and training accuracy
 epochs = np.arange(0, max_iters)
 
-'''
+
 plt.plot(epochs, validation_acc, label="validation accuracy")
 plt.plot(epochs, training_acc, label="training accuracy")
 plt.xlabel("epochs")
@@ -138,7 +141,7 @@ plt.ylabel("loss")
 plt.legend()
 plt.title("Train & Validation Loss")
 plt.show()
-'''
+
 '''
 # Q3.2
 plt.plot(epochs, training_acc)
@@ -161,9 +164,10 @@ if False: # view the data
         plt.show()
 import pickle
 saved_params = {k:v for k,v in params.items() if '_' not in k}
+'''
 with open('q3_weights.pickle', 'wb') as handle:
     pickle.dump(saved_params, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
+'''
 # Q3.3
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid

@@ -25,7 +25,7 @@ def findLetters(image):
     sigma_est = skimage.restoration.estimate_sigma(image, channel_axis=-1, average_sigmas=True)
     
     # denoise image with estimated sigma
-    gaussian_img = skimage.filters.gaussian(image, sigma=sigma_est)
+    gaussian_img = skimage.filters.gaussian(image, sigma=sigma_est, channel_axis=-1)
     
     # greyscale image
     greyscale_img = skimage.color.rgb2gray(gaussian_img)
@@ -35,8 +35,8 @@ def findLetters(image):
     bw = greyscale_img < thresh
     
     # morphology (closing)
-    bw = skimage.morphology.closing(bw, skimage.morphology.square(3))
-    
+    bw = skimage.morphology.closing(bw, skimage.morphology.square(5))
+
     # label connected groups of character pixels
     label_img = skimage.morphology.label(bw, connectivity=2)
     
@@ -54,7 +54,8 @@ def findLetters(image):
     
     # calculate upper left and lower left coords of regions, skip small regions
     for region in label_props:
-        if region.area >= thresh_mean:
+        if region.area > thresh_mean:
             bboxes.append(region.bbox)
 
+    bw = np.logical_not(bw).astype(float)
     return bboxes, bw
