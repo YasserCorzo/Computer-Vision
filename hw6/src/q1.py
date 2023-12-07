@@ -5,10 +5,13 @@
 # ##################################################################### #
 
 # Imports
+import cv2
 import numpy as np
 import os
+import scipy
 import skimage
 from matplotlib import pyplot as plt
+from matplotlib import cm
 from utils import integrateFrankot
 
 def renderNDotLSphere(center, rad, light, pxSize, res):
@@ -46,24 +49,27 @@ def renderNDotLSphere(center, rad, light, pxSize, res):
 
     image = np.zeros(res)
     
-    # camera intrinsics matrix (no skew, origin of camera and sphere are aligned)
-    K = np.array(([pxSize, 0, 0], [0, pxSize, 0], [0, 0, 1]))
-    
-    for x in range(res[0]):
-        for y in range(res[1]):
-            # 2d point (added radius since camera is viewing sphere from negative z direction)
-            point_2d = np.array([y, x, -rad]).reshape(-1, 1)
-            
-            # calculate corresponding 3D coordinate of camera pixel coordinate
-            point_3d = (K @ point_2d).T.reshape(3,)
+    for i in range(res[0]):
+        for j in range(res[1]):
+            # subtract by half of camera dims to ensure that the coordinate system is centered at the middle of the frame
+            point = np.array([(i - res[0]/2) * pxSize, (j- res[1]/2) * pxSize])
+            x, y = point[0], point[1]
+
+            # center coords of sphere
+            (a, b, c) = center
+
+            # solve for z
+            z = np.lib.scimath.sqrt(np.square(rad) - np.square(x - a) - np.square(y - b)) + c
+
+            point = np.array([x - a, y - b, z - c])
             
             # calculate normal vector at 3D point on sphere
-            n = (point_3d - center) / np.linalg.norm(point_3d - center)
+            n = point / np.linalg.norm(point)
             
             # calculate observed radiance (pixel value can't be negative)
             I = max(0, np.dot(n, light))
             
-            image[x, y] = I    
+            image[i, j] = I    
     
     return image
 
@@ -105,22 +111,17 @@ def loadData(path = "../data/"):
             tif_files_path.append(path + file)
         else:
             L = np.load(path + file).T
-            
-    print(tif_files_path)
     
     img = np.array(plt.imread(tif_files_path[0]))
-    s = img.shape
-    P = img.shape[0] * img.shape[1]
-    print(P)
+    s = (img.shape[0], img.shape[1])
     
     I = []
     for file in tif_files_path:
-        img = plt.imread(file).astype('uint16')
-        i = np.array(img[:, :, 1], dtype='uint16')
+        img = cv2.imread(file, cv2.IMREAD_UNCHANGED)
+        i = np.array(img[:, :, 1])
         I.append(i.flatten())
     
     I = np.array(I)
-    print(I.shape)
     
     return I, L, s
 
@@ -148,6 +149,12 @@ def estimatePseudonormalsCalibrated(I, L):
     """
 
     B = None
+
+    B, _, _, _ = np.linalg.lstsq(L @ L.T, L @ I)
+    print(B)
+
+    print(np.linalg.inv((L @ L.T)) @ L @ I)
+
     return B
 
 
@@ -172,8 +179,12 @@ def estimateAlbedosNormals(B):
         The 3 x P matrix of normals
     '''
 
-    albedos = None
-    normals = None
+    # dimension (P,)
+    albedos = np.linalg.norm(B, axis=0)
+    print(albedos.shape)
+
+    # 3 x P
+    normals = (B.T / albedos.reshape(-1, 1)).T
     return albedos, normals
 
 
@@ -208,8 +219,10 @@ def displayAlbedosNormals(albedos, normals, s):
 
     """
 
-    albedoIm = None
-    normalIm = None
+    albedoIm = albedos.reshape(s)
+
+    normalIm = [normals[i].reshape(s) for i in range(normals.shape[0])]
+    normalIm = np.stack(normalIm, axis=2)
 
     return albedoIm, normalIm
 
@@ -238,6 +251,43 @@ def estimateShape(normals, s):
     """
 
     surface = None
+
+    # horizontal and vertical gradients are every pixel p
+    zx = np.zeros(normals.shape[1])
+    zy = np.zeros(normals.shape[1])
+
+    # calculate the x and y derivative at every pixel p
+    for p in range(normals.shape[1]):
+        pixel_norm = normals[:, p] 
+        fx = -pixel_norm[0] / pixel_norm[-1]
+        fy = -pixel_norm[1] / pixel_norm[-1]
+        zx[p] = fx
+        zy[p] = fy
+    
+    # add 3 channels to gradients (dim s)
+    #zx = [zx.reshape((s[0], s[1])) for _ in range(s[2])]
+    #zy = [zy.reshape((s[0], s[1])) for _ in range(s[2])]
+
+    zx = zx.reshape((s[0], s[1]))
+    zy = zy.reshape((s[0], s[1]))
+
+    #zx = np.stack(zx, axis=2)
+    #zy = np.stack(zy, axis=2)
+    
+    z = integrateFrankot(zx, zy)
+    print(z)
+    x = np.arange(0, s[0])
+    y = np.arange(0, s[1])
+    ys, xs = np.meshgrid(y, x)
+    print(s)
+    print(xs.shape)
+    print(ys.shape)
+
+    surface = [xs, ys, z]
+    surface = np.stack(surface, axis=2)
+    print(surface.shape)
+    print(s)
+    
     return surface
 
 
@@ -258,6 +308,16 @@ def plotSurface(surface):
         None
 
     """
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+
+    X = surface[:, :, 0]
+    Y = surface[:, :, 1]
+    Z = surface[:, :, 2]
+
+    ax.plot_surface(X, Y, Z, cmap=cm.coolwarm)
+
+    plt.show()
+
 
     pass
 
@@ -268,47 +328,44 @@ if __name__ == '__main__':
     
     # Q1.b
     '''
-    light_dirs = np.array(([1, 1, 1], [1, -1, 1], [-1, -1, 1])) / np.sqrt(3)
-    res = (3840, 2160)
-    pxSize = 7 * 10e-6
-    rad = 0.75 * 10e-2
-    center = np.array([0, 0, 0])
-    for i in range(light_dirs.shape[0]):
-        image = renderNDotLSphere(center, rad, light_dirs[0, :], pxSize, res)
-        plt.figure()
-        plt.imshow(image)
-        plt.show()
-    '''
-        
-    # Camera parameters
-    camera_position = np.array([0, 0, 10])
-    pixel_size = 7e-4  # 7 µm in meters
-    resolution = (2160, 3840)  # Height x Width
-
-    # Sphere parameters
-    sphere_center = np.array([0, 0, 0])
-    sphere_radius = 0.0075  # 0.75 cm in meters
-
-    # Lighting directions
-    light_directions = [
+    light_dirs = [
         np.array([1, 1, 1]) / np.sqrt(3),
         np.array([1, -1, 1]) / np.sqrt(3),
         np.array([-1, -1, 1]) / np.sqrt(3)
     ]
-    '''
-    # Render images for each lighting direction
-    for idx, light_dir in enumerate(light_directions):
-        rendered_image = renderNDotLSphere(sphere_center, sphere_radius, light_dir, pixel_size, resolution)
-
-        # Display or save the rendered image
-        plt.imshow(rendered_image, cmap='gray')
-        plt.title(f"Light Direction {idx+1}")
+    res = (2160, 3840)
+    pxSize = 7e-4  # 7 µm in meters
+    rad = 0.0075  # 0.75 cm in meters
+    center = np.array([0, 0, 0])
+    for i in range(len(light_dirs)):
+        image = renderNDotLSphere(center, rad, light_dirs[i], pxSize, res)
+        plt.figure()
+        plt.imshow(image, cmap='gray')
         plt.show()
-    '''   
+    '''
     # Q1.c
     I, L, s = loadData()
+    print(I.dtype)
     
     #Q1.d
-    U, S, Vh = np.linalg.svd(I, full_matrices=True, compute_uv=True, hermitian=False)
-    print("Singular values of I:", np.diagonal(S))
+    U, S, Vh = np.linalg.svd(I, full_matrices=False, compute_uv=True)
+    print("Singular values of I:", S)
+
+    # Q1.e
+    B = estimatePseudonormalsCalibrated(I, L)
+    print("shape of B:", B.shape)
+    albedos, normals = estimateAlbedosNormals(B)
+
+    # Q1.f
+    albedoIm, normalIm = displayAlbedosNormals(albedos, normals, s)
+    plt.imshow(albedoIm, cmap='gray')
+    plt.show()
+
+    plt.imshow(normalIm, cmap='rainbow')
+    plt.show()
+
+    # Q1.i
+    surface = estimateShape(normals, s)
+    plotSurface(surface)
+
     pass
