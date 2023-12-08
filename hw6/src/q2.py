@@ -35,7 +35,7 @@ def estimatePseudonormalsUncalibrated(I):
 
     # Perform SVD on the reshaped matrix
     U, S, Vt = np.linalg.svd(I, full_matrices=False)
-    print(U.shape)
+    
     # to reduce to rank 3, set all singular values to 0 except top 3
     B = Vt[:3, :]
     L = U[:, :3].T
@@ -52,18 +52,27 @@ if __name__ == "__main__":
 
     B_hat, L_hat = estimatePseudonormalsUncalibrated(I)
 
+    # Q2.f
+
+    # u, v tilts plane
+    u = 2 
+    v = 0.5
+    l = 0.5 # shrink or expands shape
+    G = np.array(([1, 0, 0], [0, 1, 0], [u, v, l]))
+    B_hat = np.linalg.inv(G) @ B_hat
+
     albedos, normals = estimateAlbedosNormals(B_hat)
 
     albedoIm, normalIm = displayAlbedosNormals(albedos, normals, s)
 
-    plt.imshow(albedoIm, cmap='gray')
-    plt.show()
+    #plt.imshow(albedoIm, cmap='gray')
+    #plt.show()
 
-    plt.imshow(normalIm, cmap='rainbow')
-    plt.show()
+    #plt.imshow(normalIm, cmap='rainbow')
+    #plt.show()
 
-    surface = estimateShape(normals, s)
-    plotSurface(surface)
+    #surface = estimateShape(normals, s)
+    #plotSurface(surface)
 
     Nt = enforceIntegrability(B_hat, s)
 

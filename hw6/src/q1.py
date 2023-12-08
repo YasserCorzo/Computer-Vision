@@ -8,10 +8,13 @@
 import cv2
 import numpy as np
 import os
-import scipy
+
 import skimage
 from matplotlib import pyplot as plt
 from matplotlib import cm
+from scipy.sparse import kron as spkron
+from scipy.sparse import eye as speye
+from scipy.sparse.linalg import lsqr as splsqr
 from utils import integrateFrankot
 
 def renderNDotLSphere(center, rad, light, pxSize, res):
@@ -52,15 +55,15 @@ def renderNDotLSphere(center, rad, light, pxSize, res):
     for i in range(res[0]):
         for j in range(res[1]):
             # subtract by half of camera dims to ensure that the coordinate system is centered at the middle of the frame
-            point = np.array([(i - res[0]/2) * pxSize, (j- res[1]/2) * pxSize])
+            point = np.array([(i - res[0]/2) * pxSize, (j - res[1]/2) * pxSize])
             x, y = point[0], point[1]
 
             # center coords of sphere
             (a, b, c) = center
 
             # solve for z
-            z = np.lib.scimath.sqrt(np.square(rad) - np.square(x - a) - np.square(y - b)) + c
-
+            z = np.lib.scimath.sqrt(rad**2 - (x - a)**2 - (y - b)**2) + c
+            z = np.real(z)
             point = np.array([x - a, y - b, z - c])
             
             # calculate normal vector at 3D point on sphere
@@ -99,30 +102,39 @@ def loadData(path = "../data/"):
         Image shape
 
     """
-
+    
     I = None
     L = None
     s = None
 
-    files = os.listdir(path)
-    tif_files_path = []
-    for file in files:
-        if file.endswith('.tif'):
-            tif_files_path.append(path + file)
-        else:
-            L = np.load(path + file).T
-    
-    img = np.array(plt.imread(tif_files_path[0]))
+    L = np.load(path + 'sources.npy')
+    img = np.array(plt.imread(path + 'input_1.tif'))
     s = (img.shape[0], img.shape[1])
     
     I = []
-    for file in tif_files_path:
+    for idx in range(7):
+        file = path + 'input_' + f'{idx + 1}' +'.tif'
         img = cv2.imread(file, cv2.IMREAD_UNCHANGED)
-        i = np.array(img[:, :, 1])
-        I.append(i.flatten())
-    
+        i = img[:, :, 1].reshape(-1,)
+        I.append(i)
     I = np.array(I)
     
+    '''
+    from skimage.io import imread
+    from skimage.color import rgb2xyz
+
+    L = np.load(path + 'sources.npy')
+
+    im = imread(path + 'input_1.tif')
+    P = im[:, :, 0].size
+    s = im[:, :, 0].shape
+
+    I = np.zeros((7, P))
+    for i in range(1, 8):
+        im = imread(path + 'input_' + str(i) + '.tif')
+        im = rgb2xyz(im)[:, :, 1]
+        I[i-1, :] = im.reshape(-1,)
+    '''
     return I, L, s
 
 
@@ -148,13 +160,9 @@ def estimatePseudonormalsCalibrated(I, L):
         The 3 x P matrix of pesudonormals
     """
 
-    B = None
+    B, _, _, _ = np.linalg.lstsq(L.T @ L, L.T @ I, rcond=-1)
 
-    B, _, _, _ = np.linalg.lstsq(L @ L.T, L @ I)
-    print(B)
-
-    print(np.linalg.inv((L @ L.T)) @ L @ I)
-
+    #B = np.linalg.pinv(L @ L.T) @ (L @ I)
     return B
 
 
@@ -184,7 +192,12 @@ def estimateAlbedosNormals(B):
     print(albedos.shape)
 
     # 3 x P
-    normals = (B.T / albedos.reshape(-1, 1)).T
+    normals = []
+    for p in range(B.shape[1]):
+        normal = B[:, p] / albedos[p]
+        normals.append(normal)
+    normals = np.array(normals)
+    normals = normals.T
     return albedos, normals
 
 
@@ -221,9 +234,9 @@ def displayAlbedosNormals(albedos, normals, s):
 
     albedoIm = albedos.reshape(s)
 
-    normalIm = [normals[i].reshape(s) for i in range(normals.shape[0])]
+    normalIm = [((normals[i] + 1) / 2).reshape(s) for i in range(normals.shape[0])]
+    #normalIm = [normals[i].reshape(s) for i in range(normals.shape[0])]
     normalIm = np.stack(normalIm, axis=2)
-
     return albedoIm, normalIm
 
 
@@ -264,29 +277,17 @@ def estimateShape(normals, s):
         zx[p] = fx
         zy[p] = fy
     
-    # add 3 channels to gradients (dim s)
-    #zx = [zx.reshape((s[0], s[1])) for _ in range(s[2])]
-    #zy = [zy.reshape((s[0], s[1])) for _ in range(s[2])]
-
-    zx = zx.reshape((s[0], s[1]))
-    zy = zy.reshape((s[0], s[1]))
-
-    #zx = np.stack(zx, axis=2)
-    #zy = np.stack(zy, axis=2)
+    zx = zx.reshape(s)
+    zy = zy.reshape(s)
     
     z = integrateFrankot(zx, zy)
-    print(z)
-    x = np.arange(0, s[0])
-    y = np.arange(0, s[1])
-    ys, xs = np.meshgrid(y, x)
-    print(s)
-    print(xs.shape)
-    print(ys.shape)
+
+    x = np.arange(0, s[1])
+    y = np.arange(0, s[0])
+    xs, ys = np.meshgrid(x, y)
 
     surface = [xs, ys, z]
     surface = np.stack(surface, axis=2)
-    print(surface.shape)
-    print(s)
     
     return surface
 
@@ -314,8 +315,10 @@ def plotSurface(surface):
     Y = surface[:, :, 1]
     Z = surface[:, :, 2]
 
-    ax.plot_surface(X, Y, Z, cmap=cm.coolwarm)
+    surface = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm)
 
+    # Add a color bar which maps values to colors.
+    fig.colorbar(surface, shrink=0.5, aspect=5)
     plt.show()
 
 
@@ -335,7 +338,7 @@ if __name__ == '__main__':
     ]
     res = (2160, 3840)
     pxSize = 7e-4  # 7 µm in meters
-    rad = 0.0075  # 0.75 cm in meters
+    rad = 0.75  # 0.75 cm in meters
     center = np.array([0, 0, 0])
     for i in range(len(light_dirs)):
         image = renderNDotLSphere(center, rad, light_dirs[i], pxSize, res)
@@ -345,7 +348,7 @@ if __name__ == '__main__':
     '''
     # Q1.c
     I, L, s = loadData()
-    print(I.dtype)
+    #print(I.dtype)
     
     #Q1.d
     U, S, Vh = np.linalg.svd(I, full_matrices=False, compute_uv=True)
@@ -353,7 +356,6 @@ if __name__ == '__main__':
 
     # Q1.e
     B = estimatePseudonormalsCalibrated(I, L)
-    print("shape of B:", B.shape)
     albedos, normals = estimateAlbedosNormals(B)
 
     # Q1.f
